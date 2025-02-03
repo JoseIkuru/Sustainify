@@ -2,14 +2,13 @@ import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo'
 import { Link } from 'expo-router'
 import { Text, View, Button } from 'react-native';
 
-export default function Page() {
+const TransporterDashboard = () => {
   const { user } = useUser()
   const { signOut } = useAuth(); // Use useAuth for signing out
-
   return (
     <View>
       <SignedIn>
-        <Text>Hello {user?.emailAddresses[0].emailAddress}</Text>
+        <Text>Hello {user?.emailAddresses[0].emailAddress} welcome to Transporter dashboard</Text>
         <Button title="Sign Out" onPress={() => signOut()} />
       </SignedIn>
       <SignedOut>
@@ -21,5 +20,7 @@ export default function Page() {
         </Link>
       </SignedOut>
     </View>
-  )
-}
+  );
+};
+
+export default TransporterDashboard;

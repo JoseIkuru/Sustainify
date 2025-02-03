@@ -5,7 +5,9 @@ import { Picker } from "@react-native-picker/picker";
 import { Link,router } from "expo-router";  // Updated import from expo-router
 import InputField from "@/component/InputField";  // Assuming this is a custom component
 import OAuth from "@/component/OAuth";
-import { useSignUp } from '@clerk/clerk-expo'
+import { useSignUp } from '@clerk/clerk-expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { Modal } from "react-native";
 
 
@@ -64,7 +66,8 @@ const SignUp = () => {
       // and redirect the user
       if (signUpAttempt.status === 'complete') {
         //Create a database user
-
+        await AsyncStorage.setItem('userRole', form.role);
+        console.log('Role saved:', form.role);
         await setActive({ session: signUpAttempt.createdSessionId })
         setVerification({
           ... verification,
@@ -182,7 +185,8 @@ const SignUp = () => {
       <Text style={styles.verifiedText}>Verified</Text>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.replace("/(root)/(tabs)/home")}
+        onPress={() => { 
+        router.push("/")}}
       >
         <Text style={styles.buttonText}>Browse Home</Text>
       </TouchableOpacity>
