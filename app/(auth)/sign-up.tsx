@@ -9,6 +9,7 @@ import { useSignUp } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Modal } from "react-native";
+import { fetchAPI } from "@/lib/fetch";
 
 
 const SignUp = () => {
@@ -66,6 +67,14 @@ const SignUp = () => {
       // and redirect the user
       if (signUpAttempt.status === 'complete') {
         //Create a database user
+        await fetchAPI("/(api)/user", {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.name,
+            email: form.email,
+            clerkId: signUpAttempt.createdUserId,
+          }),
+        });
         await AsyncStorage.setItem('userRole', form.role);
         console.log('Role saved:', form.role);
         await setActive({ session: signUpAttempt.createdSessionId })
