@@ -7,6 +7,7 @@ import { Link, useRouter } from "expo-router";  // Updated import from expo-rout
 import InputField from "@/component/InputField";  // Assuming this is a custom component
 import OAuth from "@/component/OAuth";
 import React from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn()
@@ -27,12 +28,24 @@ const onSignInPress = React.useCallback(async () => {
       identifier:form.email,
       password: form.password,
     })
+    console.log('Form role before sign-in:', form.role);
+
 
     // If sign-in process is complete, set the created session as active
     // and redirect the user
     if (signInAttempt.status === 'complete') {
       await setActive({ session: signInAttempt.createdSessionId })
-      router.replace('/')
+      if (form.role) {
+        await AsyncStorage.setItem('userRole', form.role); // Ensure role is saved
+        console.log('Role saved successfully:', form.role); // Debugging log
+      } else {
+        console.error('form.role is undefined!'); // Debugging log
+      }
+    
+      const savedRole = await AsyncStorage.getItem('userRole'); // Verify it was saved
+      console.log('Retrieved role from storage:', savedRole); // Debugging log
+    
+      router.push("/"); // Redirect to index.tsx
     } else {
       // If the status isn't complete, check why. User might need to
       // complete further steps.
@@ -81,6 +94,7 @@ const onSignInPress = React.useCallback(async () => {
             <Picker.Item label="Transporter" value="transporter" />
             <Picker.Item label="Seller" value="seller" />
           </Picker>
+          
         </View>
       </View>
 

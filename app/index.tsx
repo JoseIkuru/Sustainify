@@ -49,12 +49,20 @@ const Home = () => {
     return <Text>{error}</Text>;
   }
 
+  if(isSignedIn){
+    console.log("We are signed in")
+    console.log(role)
+  }
+  else{
+    console.log("We are not")
+  }
+
   // Redirect based on role
   if (isSignedIn && role) {
     console.log('User signed in with role:', role); // Log role for debugging
     switch (role) {
       case 'buyer':
-        return <Redirect href="/(root)/pages/buyer/dashboard" />;
+      return <Redirect href="/(root)/pages/buyer/dashboard" />;
       case 'transporter':
         return <Redirect href="/(root)/pages/transporter/dashboard" />;
       case 'seller':
@@ -63,7 +71,12 @@ const Home = () => {
         console.log('Role not recognized:', role);
         return <Text>Invalid role. Please select a valid role.</Text>;
     }
+
+    
+    
   }
+
+  
 
   // If not signed in or role is missing, redirect to welcome page
   return <Redirect href="/(auth)/welcome" />;
