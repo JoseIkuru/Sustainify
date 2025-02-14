@@ -1,62 +1,65 @@
 import { ScrollView, Text, TouchableOpacity, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Picker } from "@react-native-picker/picker";
-import { useSignIn } from '@clerk/clerk-expo'
-import { Link, useRouter } from "expo-router";  // Updated import from expo-router
-import InputField from "@/component/InputField";  // Assuming this is a custom component
+import { useSignIn } from '@clerk/clerk-expo';
+import { Link, useRouter } from "expo-router";
+import InputField from "@/component/InputField";
 import OAuth from "@/component/OAuth";
-import React from 'react'
+import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SignIn = () => {
-  const { signIn, setActive, isLoaded } = useSignIn()
-  const router = useRouter()
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const router = useRouter();
+  
   const [form, setForm] = useState({
     email: "",
     password: "",
-    role: "",
+    role: "", 
   });
 
-// Handle the submission of the sign-in form
-const onSignInPress = React.useCallback(async () => {
-  if (!isLoaded) return
+  // Debugging useEffect to track state changes
+  useEffect(() => {
+    console.log("Updated form state:", form);
+  }, [form]);
 
-  // Start the sign-in process using the email and password provided
-  try {
-    const signInAttempt = await signIn.create({
-      identifier:form.email,
-      password: form.password,
-    })
-    console.log('Form role before sign-in:', form.role);
+  // Handle the submission of the sign-in form
+  const onSignInPress = useCallback(async () => {
+    if (!isLoaded) return;
 
+    console.log("Final form state before sign-in:", form); // Debugging log
 
-    // If sign-in process is complete, set the created session as active
-    // and redirect the user
-    if (signInAttempt.status === 'complete') {
-      await setActive({ session: signInAttempt.createdSessionId })
-      if (form.role) {
-        await AsyncStorage.setItem('userRole', form.role); // Ensure role is saved
-        console.log('Role saved successfully:', form.role); // Debugging log
-      } else {
-        console.error('form.role is undefined!'); // Debugging log
-      }
-    
-      const savedRole = await AsyncStorage.getItem('userRole'); // Verify it was saved
-      console.log('Retrieved role from storage:', savedRole); // Debugging log
-    
-      router.push("/"); // Redirect to index.tsx
-    } else {
-      // If the status isn't complete, check why. User might need to
-      // complete further steps.
-      console.error(JSON.stringify(signInAttempt, null, 2))
+    if (!form.role) {
+      console.error("Role is not selected before signing in!");
+      return;
     }
-  } catch (err) {
-    // See https://clerk.com/docs/custom-flows/error-handling
-    // for more info on error handling
-    console.error(JSON.stringify(err, null, 2))
-  }
-}, [isLoaded, form.email, form.password])
+
+    try {
+      const signInAttempt = await signIn.create({
+        identifier: form.email,
+        password: form.password,
+      });
+
+      console.log("Form role before sign-in:", form.role);
+
+      if (signInAttempt.status === "complete") {
+        await setActive({ session: signInAttempt.createdSessionId });
+        await AsyncStorage.setItem("userRole", form.role);
+        console.log("Role saved successfully:", form.role);
+
+        setTimeout(async () => {
+          const savedRole = await AsyncStorage.getItem("userRole");
+          console.log("Retrieved role from storage:", savedRole);
+          router.push("/");
+        }, 1000);
+      } else {
+        console.error(JSON.stringify(signInAttempt, null, 2));
+      }
+    } catch (err) {
+      console.error(JSON.stringify(err, null, 2));
+    }
+  }, [isLoaded, form]);
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
@@ -71,14 +74,14 @@ const onSignInPress = React.useCallback(async () => {
           label="Email"
           placeholder="Enter your email"
           value={form.email}
-          onChangeText={(value) => setForm({ ...form, email: value })}
+          onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
         />
         <InputField
           label="Password"
           placeholder="Enter your password"
           secureTextEntry={true}
           value={form.password}
-          onChangeText={(value) => setForm({ ...form, password: value })}
+          onChangeText={(value) => setForm((prev) => ({ ...prev, password: value }))}
         />
 
         {/* Role Selection Dropdown */}
@@ -86,7 +89,10 @@ const onSignInPress = React.useCallback(async () => {
         <View style={styles.pickerWrapper}>
           <Picker
             selectedValue={form.role}
-            onValueChange={(value) => setForm({ ...form, role: value })}
+            onValueChange={(value) => {
+              console.log("Role selected:", value); // Debugging log
+              setForm((prev) => ({ ...prev, role: value }));
+            }}
             style={styles.picker}
           >
             <Picker.Item label="Select Role" value="" />
@@ -94,7 +100,6 @@ const onSignInPress = React.useCallback(async () => {
             <Picker.Item label="Transporter" value="transporter" />
             <Picker.Item label="Seller" value="seller" />
           </Picker>
-          
         </View>
       </View>
 
@@ -103,12 +108,12 @@ const onSignInPress = React.useCallback(async () => {
         <Text style={styles.buttonText}>Sign in</Text>
       </TouchableOpacity>
 
-      <OAuth/>
+      <OAuth />
 
-      {/* Link to Sign In */}
+      {/* Link to Sign Up */}
       <View style={styles.contain}>
         <Text style={styles.text}>Don't have an account? </Text>
-        <Link href="/sign-up" style={styles.linkText}>Sign Up</Link> {/* Fixed Link */}
+        <Link href="/sign-up" style={styles.linkText}>Sign Up</Link>
       </View>
     </ScrollView>
   );
@@ -124,11 +129,11 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
-    color: "#AAA", // Adjust color to match text-general-200
+    color: "#AAA",
   },
   linkText: {
     fontSize: 16,
-    color: "#085A2D", // Adjust color to match text-primary-500
+    color: "#085A2D",
     fontWeight: "600",
   },
   scrollContainer: {

@@ -1,33 +1,44 @@
 import { neon } from '@neondatabase/serverless';
 
+
+
 export async function GET(request: Request) {
   try {
-    // Initialize the Neon connection using your DATABASE_URL
+    // Ensure DATABASE_URL is set
+    if (!process.env.DATABASE_URL) {
+      return new Response(JSON.stringify({ error: "DATABASE_URL is missing" }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const sql = neon(`${process.env.DATABASE_URL}`);
 
-    // Get query parameters (for example, filtering by status)
+    // Get query parameters
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status'); // e.g., 'pending'
+    const status = searchParams.get('status');
 
     let orders;
     if (status) {
       orders = await sql`
-        SELECT *
-        FROM orders
-        WHERE status = ${status}
-        ORDER BY created_at DESC;
+        SELECT * FROM orders WHERE status = ${status} ORDER BY created_at DESC;
       `;
     } else {
       orders = await sql`
-        SELECT *
-        FROM orders
-        ORDER BY created_at DESC;
+        SELECT * FROM orders ORDER BY created_at DESC;
       `;
     }
 
-    return new Response(JSON.stringify({ data: orders }), { status: 200 });
+    return new Response(JSON.stringify({ data: orders }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
   } catch (error) {
     console.error("Error fetching orders:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

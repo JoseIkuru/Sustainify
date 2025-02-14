@@ -30,8 +30,7 @@ export async function POST(request: Request) {
       FROM sellers
       WHERE 
         waste_type = ${wasteType}
-        AND ABS(weight - ${requestedWeight}) / ${requestedWeight} < 0.1
-        AND location = ${location}
+        AND ABS(weight - ${requestedWeight}) / ${requestedWeight} > 0.1
       LIMIT 1;
     `;
     
