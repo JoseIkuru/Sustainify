@@ -6,6 +6,7 @@ import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { useFetch } from '@/lib/fetch';
 import { Ionicons } from '@expo/vector-icons'; // Icons for UI enhancement
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TransporterDashboard = () => {
   const { user } = useUser();
@@ -28,12 +29,14 @@ const TransporterDashboard = () => {
       // Alert.alert("Order Accepted", `Order ID ${orderId} accepted`);
       refetch(); // Refresh orders
       router.push({
-        pathname: "/(root)/pages/transporter/LiveMapWeb",
+        pathname: "/(root)/pages/transporter/liveMap",
         params: {
           sellerLocation: JSON.stringify(sellerLocation),
           buyerLocation: JSON.stringify(buyerLocation)
         }
       });
+      await AsyncStorage.setItem('sellerLocation', JSON.stringify(sellerLocation));
+      await AsyncStorage.setItem('buyerLocation', JSON.stringify(buyerLocation));
     } catch (error) {
       console.error("Error accepting order:", error);
       Alert.alert("Error", "Could not accept the order.");
