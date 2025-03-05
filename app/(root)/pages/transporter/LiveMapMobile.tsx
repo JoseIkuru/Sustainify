@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, View, Text, StyleSheet } from 'react-native';
+import { Alert, View, Text, Button, StyleSheet, Linking, TouchableOpacity, ScrollView } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +12,12 @@ const LiveMapMobile = () => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [directions, setDirections] = useState<{ latitude: number; longitude: number }[]>([]);
   const [eta, setEta] = useState('');
+  const [currentRoute, setCurrentRoute] = useState<'seller' | 'buyer' | 'completed'>('seller'); // Controls which part of the journey to show
+    const [journeyDetails, setJourneyDetails] = useState({
+    sellerAddress: '',
+    buyerAddress: '',
+    currentAddress: '',
+  });
 
   // Get Coordinates from Address using Google Maps API
   const getCoordinatesFromAddress = async (address: string) => {
@@ -40,9 +46,6 @@ const LiveMapMobile = () => {
       try {
         const storedSellerLocation = await AsyncStorage.getItem('sellerLocation');
         const storedBuyerLocation = await AsyncStorage.getItem('buyerLocation');
-
-        console.log("Raw sellerLocation:", storedSellerLocation);
-        console.log("Raw buyerLocation:", storedBuyerLocation);
 
         let sellerCoords, buyerCoords;
 
@@ -118,27 +121,32 @@ const LiveMapMobile = () => {
     subscribeToLocation();
   }, []);
 
+
+
   // Fetch Directions from Transporter → Seller → Buyer
   useEffect(() => {
     if (!currentLocation || !sellerLocation || !buyerLocation) return;
 
-    console.log("Transporter Location:", currentLocation);
-    console.log("Seller Location:", sellerLocation);
-    console.log("Buyer Location:", buyerLocation);
+    
 
     const fetchDirections = async () => {
       try {
-        const directionsServiceUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${currentLocation.latitude},${currentLocation.longitude}&destination=${buyerLocation.latitude},${buyerLocation.longitude}&waypoints=${sellerLocation.latitude},${sellerLocation.longitude}&mode=driving&key=${googleMapsApiKey}`;
+        let directionsServiceUrl = '';
         
+        if (currentRoute === 'seller') {
+          directionsServiceUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${currentLocation.latitude},${currentLocation.longitude}&destination=${sellerLocation.latitude},${sellerLocation.longitude}&mode=driving&key=${googleMapsApiKey}`;
+        } else if (currentRoute === 'buyer') {
+          directionsServiceUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${sellerLocation.latitude},${sellerLocation.longitude}&destination=${buyerLocation.latitude},${buyerLocation.longitude}&mode=driving&key=${googleMapsApiKey}`;
+        }
+
         const response = await fetch(directionsServiceUrl);
         const data = await response.json();
 
         if (data.routes.length > 0 && data.routes[0].legs.length > 0) {
-          const firstLeg = data.routes[0].legs[0]; 
-          const secondLeg = data.routes[0].legs[1]; 
+          const firstLeg = data.routes[0].legs[0];
 
           const routeCoordinates = decodePolyline(data.routes[0].overview_polyline.points);
-          const etaText = `${firstLeg.duration.text} to Seller, then ${secondLeg.duration.text} to Buyer`;
+          const etaText = `${firstLeg.duration.text} to ${currentRoute === 'seller' ? 'Seller' : 'Buyer'}`;
 
           setDirections(routeCoordinates);
           setEta(etaText);
@@ -150,7 +158,7 @@ const LiveMapMobile = () => {
     };
 
     fetchDirections();
-  }, [currentLocation, sellerLocation, buyerLocation]);
+  }, [currentLocation, sellerLocation, buyerLocation, currentRoute]);
 
   // Decode polyline for rendering on Map
   const decodePolyline = (encoded: string): { latitude: number; longitude: number }[] => {
@@ -193,20 +201,158 @@ const LiveMapMobile = () => {
     return points;
   };
 
-  return (
-    <View style={{ flex: 1 }}>
-      <MapView style={{ flex: 1 }} showsUserLocation={true}>
-        {currentLocation && <Marker coordinate={currentLocation} title="You" />}
-        {sellerLocation && <Marker coordinate={sellerLocation} title="Seller" />}
-        {buyerLocation && <Marker coordinate={buyerLocation} title="Buyer" />}
-        {directions.length > 0 && <Polyline coordinates={directions} strokeWidth={4} strokeColor="blue" />}
-      </MapView>
+  // Open Google Maps with Seller's Location
+  const sellerMaps = () => {
+    if (!sellerLocation) {
+      console.error("Seller location is not available.");
+      return;
+    }
 
-      {eta && <View style={styles.etaContainer}><Text style={styles.etaText}>ETA: {eta}</Text></View>}
-    </View>
-  );
-};
+    const { latitude, longitude } = sellerLocation;
+    const googleMapsUrl = `http://maps.google.com?q=${latitude},${longitude}`;
 
-const styles = StyleSheet.create({ etaContainer: { position: 'absolute', top: 20, left: 20, backgroundColor: 'white', padding: 10, borderRadius: 8 }, etaText: { fontSize: 18, fontWeight: 'bold' } });
+    Linking.openURL(googleMapsUrl).catch((err) => console.error("Failed to open Google Maps", err));
+  };
+
+    // Open Google Maps with Seller's Location
+  const buyerMaps = () => {
+      if (!buyerLocation) {
+        console.error("Seller location is not available.");
+        return;
+      }
+  
+      const { latitude, longitude } = buyerLocation;
+      const googleMapsUrl = `http://maps.google.com?q=${latitude},${longitude}`;
+  
+      Linking.openURL(googleMapsUrl).catch((err) => console.error("Failed to open Google Maps", err));
+    };
+
+    useEffect(() => {
+      if (!sellerLocation || !buyerLocation || !currentLocation) return;
+  
+      const getJourneyDetails = async () => {
+        const sellerAddress = `${await getAddressFromCoordinates(sellerLocation)}`;
+        const buyerAddress = `${await getAddressFromCoordinates(buyerLocation)}`;
+        const currentAddress = `${await getAddressFromCoordinates(currentLocation)}`;
+  
+        setJourneyDetails({
+          sellerAddress,
+          buyerAddress,
+          currentAddress,
+        });
+      };
+  
+      getJourneyDetails();
+    }, [currentLocation, sellerLocation, buyerLocation]);
+  
+    // Convert coordinates to human-readable address
+    const getAddressFromCoordinates = async (coords: { latitude: number; longitude: number }) => {
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.latitude},${coords.longitude}&key=${googleMapsApiKey}`
+        );
+        const data = await response.json();
+        if (data.results.length > 0) {
+          return data.results[0].formatted_address;
+        } else {
+          return "Address not found";
+        }
+      } catch (error) {
+        console.error("Error fetching address:", error);
+        return "Error fetching address";
+      }
+    };
+  
+      return (
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>Transporter Journey Dashboard</Text>
+          
+          <View style={styles.journeyCard}>
+            <Text style={styles.cardTitle}>Journey Overview</Text>
+            <Text style={styles.cardText}>Current Route: {currentRoute === 'seller' ? 'From Transporter to Seller' : currentRoute === 'buyer' ? 'From Seller to Buyer' : 'Completed'}</Text>
+            <Text style={styles.cardText}>Seller Location: {journeyDetails.sellerAddress}</Text>
+            <Text style={styles.cardText}>Buyer Location: {journeyDetails.buyerAddress}</Text>
+            <Text style={styles.cardText}>Current Location: {journeyDetails.currentAddress}</Text>
+            {eta && <Text style={styles.cardText}>ETA: {eta}</Text>}
+          </View>
+    
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, currentRoute === 'seller' && styles.activeButton]}
+              onPress={sellerMaps}
+            >
+              <Text style={styles.buttonText}>Start from Seller</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, currentRoute === 'buyer' && styles.activeButton]}
+              onPress={buyerMaps}
+            >
+              <Text style={styles.buttonText}>Proceed to Buyer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, currentRoute === 'completed' && styles.activeButton]}
+              onPress={() => setCurrentRoute('completed')}
+            >
+              <Text style={styles.buttonText}>Complete Delivery</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      );
+    };
+    
+    const styles = StyleSheet.create({
+      container: {
+        flex: 1,
+        padding: 20,
+        backgroundColor: '#f4f4f4',
+      },
+      title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
+      },
+      journeyCard: {
+        backgroundColor: '#fff',
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      cardTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 10,
+      },
+      cardText: {
+        fontSize: 16,
+        marginBottom: 5,
+      },
+      buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20,
+      },
+      button: {
+        backgroundColor: '#007BFF',
+        padding: 15,
+        borderRadius: 8,
+        width: '30%',
+        alignItems: 'center',
+      },
+      buttonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      activeButton: {
+        backgroundColor: '#0056b3',
+      },
+    });
+     
+  
 
 export default LiveMapMobile;
