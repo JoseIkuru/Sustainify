@@ -1,156 +1,74 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, StyleSheet } from 'react-native';
-import { View, Text } from 'react-native';
-import { useStripe, PaymentIntent } from '@stripe/stripe-react-native';
-import { useRouter } from 'expo-router';
-import { fetchAPI } from '@/lib/fetch';  // Adjust if necessary
+import { Alert, Button, View, ActivityIndicator } from 'react-native';
+import { useStripe, StripeProvider } from '@stripe/stripe-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const Payments = () => {
-  const router = useRouter();
-  const [price, setPrice] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchPrice = async () => {
-      const storedPrice = await AsyncStorage.getItem('pricePayment');
-      setPrice(storedPrice);
-    };
-
-    fetchPrice();
-  }, []);
-
-  const { initPaymentSheet, presentPaymentSheet, confirmPayment } = useStripe();
-
+const PaymentScreen = () => {
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
-  const [paymentIntentClientSecret, setPaymentIntentClientSecret] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState(null); // To store payment method details
+  const [clientSecret, setClientSecret] = useState(null);
 
-  // Fetch payment sheet params from the backend (Create API)
+  // Fetch clientSecret from your backend API
   const fetchPaymentSheetParams = async () => {
+    // const price = await AsyncStorage.getItem('price');
+    // console.log(price)
+    const price = 60;
+    console.log(price)
+    if (price === null) {
+      throw new Error("Price is null");
+    }
     try {
-      const response = await fetchAPI("/(api)/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: price,  // Amount in cents
-          currency: "usd",
-          email: "user@example.com",  // Set this dynamically from user data if possible
-          name: "John Doe",  // Set dynamically from user data if possible
-        }),
+      // Here, use the price calculated from your BuyerDashboard.
+      const response = await fetch('/(api)/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: price }), // convert dollars to cents
       });
-
-      const { paymentIntent, ephemeralKey, customer } = await response.json();
-      return { paymentIntent, ephemeralKey, customer };
+      const { clientSecret } = await response.json();
+      return clientSecret;
     } catch (error) {
-      console.error("Error fetching payment params:", error);
-      Alert.alert("Error", "There was an issue fetching payment details.");
+      console.error("Error fetching PaymentIntent:", error);
     }
   };
 
-  // Initialize the payment sheet with the returned params from the Create API
-  const initializePayment = async () => {
-    const paymentParams = await fetchPaymentSheetParams();
-    if (!paymentParams) {
-      Alert.alert("Error", "Failed to initialize payment.");
+  // Initialize the PaymentSheet
+  const initializePaymentSheet = async () => {
+    const secret = await fetchPaymentSheetParams();
+    if (!secret) return;
+    setClientSecret(secret);
+
+    const { error } = await initPaymentSheet({
+      paymentIntentClientSecret: secret,
+      // Optional: customize appearance, merchantDisplayName, etc.
+      merchantDisplayName: 'Sustainify',
+    });
+    if (error) {
+      Alert.alert("Error", error.message);
       return;
     }
-    const { paymentIntent, ephemeralKey, customer } = paymentParams;
-    setPaymentIntentClientSecret(paymentIntent.client_secret);
   };
 
-  // Handle the payment flow
-  const handlePayment = async () => {
-    if (!paymentIntentClientSecret) return;
-
-    setLoading(true);
-
-    // Confirm the payment using the client secret
-    const { error, paymentIntent } = await confirmPayment(paymentIntentClientSecret, {
-      paymentMethodType: 'Card', // Or whatever payment method is selected
-    });
-
+  // Open PaymentSheet for user to complete payment
+  const openPaymentSheet = async () => {
+    const { error } = await presentPaymentSheet();
     if (error) {
-      Alert.alert(`Error: ${error.message}`);
-      setLoading(false);
+      Alert.alert("Payment failed", error.message);
     } else {
-      if (paymentIntent.status === PaymentIntent.Status.Succeeded) {
-        Alert.alert('Success', 'Payment was successful!');
-        // Optionally, call the Pay API to confirm the payment and update backend
-        await confirmPaymentIntent(paymentIntent);
-      }
-      setLoading(false);
+      Alert.alert("Success", "Your payment is confirmed!");
+      // Optionally, update your database with the payment status.
     }
   };
 
-  // Call the Pay API to confirm the payment on the backend
-  const confirmPaymentIntent = async (paymentIntent) => {
-    try {
-      const response = await fetchAPI("/(api)/pay", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          payment_method_id: paymentIntent.payment_method,
-          payment_intent_id: paymentIntent.id,
-          customer_id: paymentIntent.customer,
-          client_secret: paymentIntent.client_secret,
-        }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        Alert.alert("Payment Confirmed", "Your payment has been processed.");
-      } else {
-        Alert.alert("Error", "Payment confirmation failed.");
-      }
-    } catch (error) {
-      console.error("Error confirming payment:", error);
-      Alert.alert("Error", "There was an issue confirming the payment.");
-    }
-  };
-
-  // Initialize the payment sheet when the price is available
   useEffect(() => {
-    if (price) {
-      initializePayment();
-    }
-  }, [price]);
+    initializePaymentSheet();
+  }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Payment Details</Text>
-      <Text style={styles.price}>
-        Total Price: {price ? `$${price}` : 'Loading...'}
-      </Text>
+    <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
+        <Button title="Pay Now" onPress={openPaymentSheet} />
 
-      <Button 
-        title={loading ? 'Processing...' : 'Pay Now'} 
-        onPress={handlePayment} 
-        disabled={loading}
-        color="#085A2D"  // Customize the button color
-      />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    marginVertical: 20,
-    alignItems: "center",
-    padding: 20,
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  price: {
-    fontSize: 18,
-    marginBottom: 20,
-  },
-});
-
-export default Payments;
+export default PaymentScreen;

@@ -28,10 +28,6 @@ export async function POST(request: Request) {
     const sellerListings = await sql`
       SELECT *
       FROM sellers
-      WHERE 
-        waste_type = ${wasteType}
-        AND ABS(weight - ${requestedWeight}) / ${requestedWeight} > 0.1
-      LIMIT 1;
     `;
     
     if (!sellerListings || sellerListings.length === 0) {

@@ -25,7 +25,7 @@ const BuyerDashboard = () => {
 
 
   const calculatePrice = (totalMiles) => {
-    const pricePerMile = 2;
+    const pricePerMile = 100;
     return (totalMiles * pricePerMile).toFixed(2);
   };
 
@@ -64,7 +64,7 @@ const BuyerDashboard = () => {
 
       const { totalMiles } = distanceResponse;
       const calculatedPrice = calculatePrice(totalMiles);
-      await AsyncStorage.setItem('pricePayment', calculatedPrice);
+      await AsyncStorage.setItem('price', calculatedPrice);
       setPrice(calculatedPrice);
       setLoading(false);
       setFindingDriver(true);
@@ -79,7 +79,11 @@ const BuyerDashboard = () => {
     }
   };
   return (
-
+    <StripeProvider
+    publishableKey="pk_test_51Qzu2R2V8S747Q12iBMVGLjRnA4jz4JetlJYZEicbjLoLd06dYG0xyyr6RUjAzGV9vmNr9eUmyBbHuy4qNCemmjy00MBXfQlyl"
+    merchantIdentifier="merchant.com.sustainifyapp"  // required for Apple Pay
+    urlScheme="myapp"  // required for 3D Secure and bank redirects
+  >
     <ScrollView contentContainerStyle={styles.container}>
       <SignedIn>
         <Text style={styles.header}>Hello {user?.emailAddresses[0].emailAddress}, welcome to your Buyer Dashboard!</Text>
@@ -119,6 +123,7 @@ const BuyerDashboard = () => {
         <Link href="/(auth)/sign-up"><Text style={styles.linkText}>Sign up</Text></Link>
       </SignedOut>
     </ScrollView>
+    </StripeProvider>
   );
 };
 
