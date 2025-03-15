@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert, ActivityIndicator, View } from 'react-native';
 import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { fetchAPI } from '@/lib/fetch';
+import { StripeProvider } from '@stripe/stripe-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
 
 const BuyerDashboard = () => {
+
   const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
@@ -17,6 +22,7 @@ const BuyerDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [findingDriver, setFindingDriver] = useState(false);
   const [price, setPrice] = useState<string | null>(null);
+
 
   const calculatePrice = (totalMiles) => {
     const pricePerMile = 2;
@@ -58,6 +64,7 @@ const BuyerDashboard = () => {
 
       const { totalMiles } = distanceResponse;
       const calculatedPrice = calculatePrice(totalMiles);
+      await AsyncStorage.setItem('pricePayment', calculatedPrice);
       setPrice(calculatedPrice);
       setLoading(false);
       setFindingDriver(true);
@@ -71,8 +78,8 @@ const BuyerDashboard = () => {
       setLoading(false);
     }
   };
-
   return (
+
     <ScrollView contentContainerStyle={styles.container}>
       <SignedIn>
         <Text style={styles.header}>Hello {user?.emailAddresses[0].emailAddress}, welcome to your Buyer Dashboard!</Text>
@@ -97,9 +104,10 @@ const BuyerDashboard = () => {
           <Text style={styles.priceText}>Service Price: ${price}</Text>
         </View>
 
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/(root)/pages/buyer/payment')}>
           <Text style={styles.buttonText}>Proceed to Payment</Text>
         </TouchableOpacity>
+
       </>
     )}`
 
