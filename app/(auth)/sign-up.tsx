@@ -65,23 +65,56 @@ const SignUp = () => {
 
       // If verification was completed, set the session to active
       // and redirect the user
-      if (signUpAttempt.status === 'complete') {
+      if (signUpAttempt.status === 'complete') { 
         //Create a database user
-        await fetchAPI("/(api)/user", {
-          method: "POST",
-          body: JSON.stringify({
-            name: form.name,
-            email: form.email,
-            clerkId: signUpAttempt.createdUserId,
-          }),
-        });
-        await AsyncStorage.setItem('userRole', form.role);
-        console.log('Role saved:', form.role);
-        await setActive({ session: signUpAttempt.createdSessionId })
-        setVerification({
-          ... verification,
-          state:"success",
-        })
+        if (form.role === 'transporter') {
+          try {
+            console.log("Sending request to /transporter-account...");
+            const response = await fetchAPI("/(api)/transporter-account", {
+              method: "POST",
+              body: JSON.stringify({
+                email: form.email,
+                name: form.name,
+                clerkId: signUpAttempt.createdUserId,
+              }),
+            });
+        const data = response
+        
+        const { accountLink, connectedAccountId } = data;
+
+        if (!accountLink || !connectedAccountId) {
+          throw new Error("Missing accountLink or connectedAccountId in response");
+        }
+
+        console.log("Stripe account successfully created:", connectedAccountId);
+
+            // Optionally store connectedAccountId in your DB or AsyncStorage
+          // Redirect transporter to complete onboarding
+          console.log("Adding into database")
+          await fetchAPI("/(api)/transporter", {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.name,
+              email: form.email,
+              clerkId: signUpAttempt.createdUserId,
+              transporterId: connectedAccountId,
+            }),
+          });
+          console.log("Added into database")
+          router.push(accountLink);
+          } catch (error) {
+            console.error("Error in /transporter-account API call:", error);
+            return;  // Prevent further execution if this fails
+          }
+        
+        }
+          await AsyncStorage.setItem('userRole', form.role);
+          console.log('Role saved:', form.role);
+          await setActive({ session: signUpAttempt.createdSessionId })
+          setVerification({
+            ... verification,
+            state:"success",
+          })
       } else {
         // If the status is not complete, check why. User may need to
         // complete further steps.

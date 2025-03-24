@@ -3,10 +3,13 @@ import { Alert, View, Text, Button, StyleSheet, Linking, TouchableOpacity, Scrol
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@clerk/clerk-react';
+import { fetchAPI } from '@/lib/fetch';
 
 const googleMapsApiKey = "AIzaSyBaAUy-Z9j0yy_wWpv8XW_8VOHXupwLKzs"; // Replace with your actual API key
 
 const LiveMapMobile = () => {
+  const authUser = useAuth(); 
   const [sellerLocation, setSellerLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [buyerLocation, setBuyerLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -262,6 +265,55 @@ const LiveMapMobile = () => {
         return "Error fetching address";
       }
     };
+
+    const handleCompleteDelivery = async () => {
+      try {
+
+        if (!authUser) {
+          // Handle case where no user is authenticated (e.g., show an error)
+          throw new Error('No user found');
+        }
+    
+        const clerkId = authUser.userId;  // Get the Clerk ID from the authenticated user
+        console.log(clerkId);
+    
+        // Fetch the transporterId based on the clerkId
+        const transporterResponse = await fetchAPI('/(api)/transporter-id', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clerkId }),
+        });
+    
+        const transporterData =  transporterResponse;
+    
+        if (!transporterData.transporterId) {
+          throw new Error('Transporter not found');
+        }
+    
+        // Now use the transporterId to make the payment request
+        const transporterId = transporterData.transporterId; // Get transporterId from the response
+        console.log(transporterId)
+    
+        // const paymentResponse = await fetch('/api/pay-transporter', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ transporterId, amount: paymentAmount }),
+        // });
+    
+        // const paymentData = await paymentResponse.json();
+    
+        // if (paymentData.success) {
+        //   Alert.alert("Payment Successful", "You have received payment for this delivery.");
+        // } else {
+        //   Alert.alert("Payment Failed", "Something went wrong.");
+        // }
+      } catch (error) {
+        console.error("Error processing payment:", error);
+        Alert.alert("Error", "Unable to process payment.");
+      }
+    };
+    
+    
   
       return (
         <ScrollView contentContainerStyle={styles.container}>
@@ -291,7 +343,7 @@ const LiveMapMobile = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, currentRoute === 'completed' && styles.activeButton]}
-              onPress={() => setCurrentRoute('completed')}
+              onPress={handleCompleteDelivery}
             >
               <Text style={styles.buttonText}>Complete Delivery</Text>
             </TouchableOpacity>

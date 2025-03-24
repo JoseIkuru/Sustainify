@@ -57,6 +57,9 @@ const BuyerDashboard = () => {
       }
 
       const sellerLocation = matchResponse.data[0].seller_location;
+      const status = matchResponse.data[0].status;
+      const id = matchResponse.data[0].id;
+      
       const distanceResponse = await fetchAPI("/(api)/calculate-distance", {
         method: "POST",
         body: JSON.stringify({ buyerLocation: location, sellerLocation }),
