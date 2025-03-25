@@ -4,14 +4,16 @@ import {
 } from 'react-native';
 import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
-import { useFetch } from '@/lib/fetch';
+import { fetchAPI, useFetch } from '@/lib/fetch';
 import { Ionicons } from '@expo/vector-icons'; // Icons for UI enhancement
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+
 const TransporterDashboard = () => {
-  const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
+  const { user } = useUser();
+
 
   // Fetch pending orders
   const { data, loading, error, refetch } = useFetch<any>("/(api)/orders");
@@ -19,24 +21,35 @@ const TransporterDashboard = () => {
   // Accept order function
   const onAcceptOrder = async (orderId: number, sellerLocation: any, buyerLocation:any) => {
     try {
-      // const response = await fetch(`/(api)/orders/${orderId}/accept`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      // });
 
-      // if (!response.ok) throw new Error("Failed to accept order");
+    
+    const transporterName = "John Doe"; // Hardcoded for now
+    const transporterEmail = user?.emailAddresses[0].emailAddress;
+    
+    console.log("Accepting order:", { orderId, transporterName, transporterEmail });
 
-      // Alert.alert("Order Accepted", `Order ID ${orderId} accepted`);
-      refetch(); // Refresh orders
-      router.push({
-        pathname: "/(root)/pages/transporter/liveMap",
-        params: {
-          sellerLocation: JSON.stringify(sellerLocation),
-          buyerLocation: JSON.stringify(buyerLocation)
-        }
-      });
-      await AsyncStorage.setItem('sellerLocation', JSON.stringify(sellerLocation));
-      await AsyncStorage.setItem('buyerLocation', JSON.stringify(buyerLocation));
+    
+    // Call the API to accept the order
+    const response = await fetchAPI('/(api)/accept-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId,
+        transporterName,
+        transporterEmail
+      })
+    });
+    
+    refetch(); // Refresh orders
+    router.push({
+      pathname: "/(root)/pages/transporter/liveMap",
+      params: {
+        sellerLocation: JSON.stringify(sellerLocation),
+        buyerLocation: JSON.stringify(buyerLocation)
+      }
+    });
+    await AsyncStorage.setItem('sellerLocation', JSON.stringify(sellerLocation));
+    await AsyncStorage.setItem('buyerLocation', JSON.stringify(buyerLocation));
     } catch (error) {
       console.error("Error accepting order:", error);
       Alert.alert("Error", "Could not accept the order.");

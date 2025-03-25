@@ -57,9 +57,52 @@ const BuyerDashboard = () => {
       }
 
       const sellerLocation = matchResponse.data[0].seller_location;
-      const status = matchResponse.data[0].status;
-      const id = matchResponse.data[0].id;
+      let status = matchResponse.data[0].status;
+      let id = 28;
+      const checkStatus = async () => {
+        let statusChecked = false;
+        console.log(statusChecked)
+        if (status !== "accepted" && !statusChecked) {
+          setFindingDriver(true);
+          Alert.alert("Status", "Still finding driver");
+  
+          // Wait for a while before checking the status again
+          await new Promise(resolve => setTimeout(resolve, 5000));
+  
+          // Check status again
+          try {
+
+            const response = await fetchAPI("/(api)/get-status", {
+              method: "POST",
+              body: JSON.stringify({ id }),
+            });
+        
+            const data = await response;
+            
+            if (data.error) {
+              console.log("Error fetching status:", data.error);
+            } else {
+              console.log("Order status:", data.status);  // This will log the order status
+              if (data.status === "accepted") {
+                statusChecked = true;  // Status is accepted, exit the loop
+                console.log(statusChecked)
+              }
+            }
+          } catch (error) {
+            console.error("Error calling API:", error);
+          }
+        }
+        if (statusChecked) {
+          console.log("Status updated to accepted");
+        } else {
+          console.log("Order status check timed out or failed.");
+        }
+      };
       
+      console.log("Checking status...");
+      checkStatus();
+      console.log("Status checked");
+
       const distanceResponse = await fetchAPI("/(api)/calculate-distance", {
         method: "POST",
         body: JSON.stringify({ buyerLocation: location, sellerLocation }),
@@ -67,6 +110,27 @@ const BuyerDashboard = () => {
 
       const { totalMiles } = distanceResponse;
       const calculatedPrice = calculatePrice(totalMiles);
+
+
+      try {
+        const id1 = 28;
+        const price2 =100;
+        const response = await fetchAPI("/(api)/update-price", {
+          method: "POST",
+          body: JSON.stringify({ orderId: id1, price: price2 }),
+        });
+    
+        const data = await response;
+        
+        if (data.error) {
+          console.log("Error updating order price:", data.error);
+        } else {
+          console.log("Order price updated successfully");
+        }
+      } catch (error) {
+        console.error("Error calling API:", error);
+      }
+
       await AsyncStorage.setItem('price', calculatedPrice);
       setPrice(calculatedPrice);
       setLoading(false);
