@@ -13,6 +13,7 @@ const TransporterDashboard = () => {
   const { signOut } = useAuth();
   const router = useRouter();
   const { user } = useUser();
+  const authUser = useAuth(); 
 
 
   // Fetch pending orders
@@ -22,10 +23,22 @@ const TransporterDashboard = () => {
   const onAcceptOrder = async (orderId: number, sellerLocation: any, buyerLocation:any) => {
     try {
 
-    
-    const transporterName = "John Doe"; // Hardcoded for now
+    console.log(user);
+    const clerkId = authUser.userId; 
+    console.log(clerkId);
+
+// Hardcoded for now
+    const transporterResponse = await fetchAPI('/(api)/transporter-name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clerkId }),
+    });
+
+    const transporterName = await transporterResponse;
+    console.log(transporterName);
     const transporterEmail = user?.emailAddresses[0].emailAddress;
     
+
     console.log("Accepting order:", { orderId, transporterName, transporterEmail });
 
     

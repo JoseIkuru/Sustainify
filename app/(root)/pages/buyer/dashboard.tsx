@@ -61,90 +61,93 @@ const BuyerDashboard = () => {
       let id = 28;
       const checkStatus = async () => {
         let statusChecked = false;
-        console.log(statusChecked)
-        if (status !== "accepted" && !statusChecked) {
+        console.log("Initial statusChecked:", statusChecked);
+      
+        while (status !== "accepted" && !statusChecked) {
           setFindingDriver(true);
-          Alert.alert("Status", "Still finding driver");
-  
-          // Wait for a while before checking the status again
           await new Promise(resolve => setTimeout(resolve, 5000));
-  
-          // Check status again
+      
+          console.log("Checking order status for ID:", id);
+          if (!id) {
+            console.error("Error: orderId is undefined.");
+            return;
+          }
+      
           try {
-
             const response = await fetchAPI("/(api)/get-status", {
               method: "POST",
-              body: JSON.stringify({ id }),
+              body: JSON.stringify({ orderId: id }),
             });
-        
+      
             const data = await response;
-            
+            console.log("Status API response:", data);
+      
             if (data.error) {
               console.log("Error fetching status:", data.error);
             } else {
-              console.log("Order status:", data.status);  // This will log the order status
+              console.log("Order status:", data.status);
               if (data.status === "accepted") {
-                statusChecked = true;  // Status is accepted, exit the loop
-                console.log(statusChecked)
+                statusChecked = true;
+                console.log("Status updated to accepted.");
               }
             }
           } catch (error) {
             console.error("Error calling API:", error);
           }
         }
+      
         if (statusChecked) {
-          console.log("Status updated to accepted");
-        } else {
-          console.log("Order status check timed out or failed.");
+          console.log("Order accepted. Now calculating distance and price...");
+      
+          try {
+            const distanceResponse = await fetchAPI("/(api)/calculate-distance", {
+              method: "POST",
+              body: JSON.stringify({ buyerLocation: location, sellerLocation }),
+            });
+      
+            const { totalMiles } = await distanceResponse;
+            const calculatedPrice = calculatePrice(totalMiles);
+            console.log("Total miles:", totalMiles, "Calculated price:", calculatedPrice);
+      
+            await AsyncStorage.setItem('price', calculatedPrice);
+            setPrice(calculatedPrice);
+      
+            const updatePriceResponse = await fetchAPI("/(api)/update-price", {
+              method: "POST",
+              body: JSON.stringify({ orderId: id, price: calculatedPrice }),
+            });
+      
+            const priceData = await updatePriceResponse;
+            if (priceData.error) {
+              console.log("Error updating order price:", priceData.error);
+            } else {
+              console.log("Order price updated successfully.");
+            }
+      
+          } catch (error) {
+            console.error("Error in distance calculation or price update:", error);
+          }
         }
+      
+        setLoading(false);
+        setFindingDriver(true);
+      
+        setTimeout(() => {
+          setFindingDriver(false);
+        }, 3000);
       };
       
       console.log("Checking status...");
       checkStatus();
-      console.log("Status checked");
-
-      const distanceResponse = await fetchAPI("/(api)/calculate-distance", {
-        method: "POST",
-        body: JSON.stringify({ buyerLocation: location, sellerLocation }),
-      });
-
-      const { totalMiles } = distanceResponse;
-      const calculatedPrice = calculatePrice(totalMiles);
-
-
-      try {
-        const id1 = 28;
-        const price2 =100;
-        const response = await fetchAPI("/(api)/update-price", {
-          method: "POST",
-          body: JSON.stringify({ orderId: id1, price: price2 }),
-        });
-    
-        const data = await response;
-        
-        if (data.error) {
-          console.log("Error updating order price:", data.error);
-        } else {
-          console.log("Order price updated successfully");
-        }
-      } catch (error) {
-        console.error("Error calling API:", error);
-      }
-
-      await AsyncStorage.setItem('price', calculatedPrice);
-      setPrice(calculatedPrice);
-      setLoading(false);
-      setFindingDriver(true);
-
-      setTimeout(() => {
-        setFindingDriver(false);
-      }, 3000);
+      console.log("Status check initiated.");
     } catch (error) {
-      console.error("Error sending buyer request:", error);
+
+      console.error("Error sending request:", error);
       Alert.alert("Error", "Failed to send request. Please try again.");
       setLoading(false);
     }
   };
+  
   return (
     <StripeProvider
     publishableKey="pk_test_51Qzu2R2V8S747Q12iBMVGLjRnA4jz4JetlJYZEicbjLoLd06dYG0xyyr6RUjAzGV9vmNr9eUmyBbHuy4qNCemmjy00MBXfQlyl"
