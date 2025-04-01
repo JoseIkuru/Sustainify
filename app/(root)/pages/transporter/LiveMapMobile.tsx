@@ -293,20 +293,37 @@ const LiveMapMobile = () => {
         // Now use the transporterId to make the payment request
         const transporterId = transporterData.transporterId; // Get transporterId from the response
         console.log(transporterId)
+
+
+        const orderId = await AsyncStorage.getItem('orderId');
+        console.log(orderId)
+        const response = await fetch("/(api)/get-price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId }),
+        });
     
-        // const paymentResponse = await fetch('/api/pay-transporter', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ transporterId, amount: paymentAmount }),
-        // });
+        const data = await response.json();
+        console.log(data);
     
-        // const paymentData = await paymentResponse.json();
-    
-        // if (paymentData.success) {
-        //   Alert.alert("Payment Successful", "You have received payment for this delivery.");
-        // } else {
-        //   Alert.alert("Payment Failed", "Something went wrong.");
-        // }
+      // Send payment request
+      const paymentAmount = data.price;
+      console.log(paymentAmount) // Example: $50.00 (amount in cents)
+      const paymentResponse = await fetchAPI('/(api)/pay-transporter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stripeAccountId: transporterId, amount: paymentAmount }),
+      });
+
+      console.log(paymentResponse)
+
+      const paymentData = await paymentResponse;
+
+      if (paymentData.success) {
+        Alert.alert("Payment Successful", "You have received payment for this delivery.");
+      } else {
+        Alert.alert("Payment Failed", "Something went wrong.");
+      }
       } catch (error) {
         console.error("Error processing payment:", error);
         Alert.alert("Error", "Unable to process payment.");

@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert, View } from 'react-native';
 import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link } from 'expo-router';
 import { fetchAPI } from '@/lib/fetch'; // Your fetch helper that calls your API
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { NavigationContainer } from '@react-navigation/native';
 
-const SellerDashboard = () => {
+const Tab = createMaterialTopTabNavigator();
+
+const RequestScreen = () => {
   const { user } = useUser();
   const { signOut } = useAuth();
 
@@ -121,6 +125,43 @@ const SellerDashboard = () => {
   );
 };
 
+const CompletedOrdersScreen = () => (
+  <View style={styles.container}>
+    <Text style={styles.pageText}>Completed Purchases will be shown here.</Text>
+  </View>
+);
+
+// Profile Screen
+const ProfileScreen = () => {
+  const { signOut } = useAuth();
+  const { user } = useUser();
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.pageText}>Welcome, {user?.emailAddresses[0].emailAddress}</Text>
+      <TouchableOpacity onPressIn={signOut} style={styles.signOutButton}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const SellerDashboard = () => {
+  return (
+      <Tab.Navigator
+        screenOptions={{
+          tabBarStyle: { backgroundColor: '#085A2D' },
+          tabBarActiveTintColor: 'white',
+          tabBarIndicatorStyle: { backgroundColor: 'yellow' },
+        }}
+      >
+        <Tab.Screen name="Request" component={RequestScreen} />
+        <Tab.Screen name="Requests" component={CompletedOrdersScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -173,6 +214,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+  signOutButton: { backgroundColor: 'red', padding: 10, marginTop: 20, alignItems: 'center', borderRadius: 5 },
+  signOutText: { color: 'black', fontSize: 16, fontWeight: 'bold' },
+  pageText: { fontSize: 18, color: 'black', textAlign: 'center', marginTop: 20 },
 });
 
 export default SellerDashboard;

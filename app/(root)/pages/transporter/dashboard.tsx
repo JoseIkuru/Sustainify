@@ -9,7 +9,12 @@ import { Ionicons } from '@expo/vector-icons'; // Icons for UI enhancement
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
-const TransporterDashboard = () => {
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+
+const Tab = createMaterialTopTabNavigator();
+
+const PendingOrdersScreen = () => {
   const { signOut } = useAuth();
   const router = useRouter();
   const { user } = useUser();
@@ -34,7 +39,7 @@ const TransporterDashboard = () => {
       body: JSON.stringify({ clerkId }),
     });
 
-    const transporterName = await transporterResponse;
+    const transporterName = await transporterResponse.transporterName;
     console.log(transporterName);
     const transporterEmail = user?.emailAddresses[0].emailAddress;
     
@@ -63,6 +68,8 @@ const TransporterDashboard = () => {
     });
     await AsyncStorage.setItem('sellerLocation', JSON.stringify(sellerLocation));
     await AsyncStorage.setItem('buyerLocation', JSON.stringify(buyerLocation));
+    await AsyncStorage.setItem('orderId', orderId.toString());
+
     } catch (error) {
       console.error("Error accepting order:", error);
       Alert.alert("Error", "Could not accept the order.");
@@ -83,7 +90,6 @@ const TransporterDashboard = () => {
       <SignedIn>
         {/* Header Section */}
         <View style={styles.header}>
-          <Ionicons name="car-outline" size={28} color="white" />
           <Text style={styles.headerText}>
             Welcome, {user?.emailAddresses[0].emailAddress}
           </Text>
@@ -143,6 +149,43 @@ const TransporterDashboard = () => {
         </View>
       </SignedOut>
     </View>
+  );
+};
+
+const CompletedOrdersScreen = () => (
+  <View style={styles.container}>
+    <Text style={styles.pageText}>Completed Orders will be shown here.</Text>
+  </View>
+);
+
+// Profile Screen
+const ProfileScreen = () => {
+  const { signOut } = useAuth();
+  const { user } = useUser();
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.pageText}>Welcome, {user?.emailAddresses[0].emailAddress}</Text>
+      <TouchableOpacity onPressIn={signOut} style={styles.signOutButton}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const TransporterDashboard = () => {
+  return (
+      <Tab.Navigator
+        screenOptions={{
+          tabBarStyle: { backgroundColor: '#085A2D' },
+          tabBarActiveTintColor: 'white',
+          tabBarIndicatorStyle: { backgroundColor: 'yellow' },
+        }}
+      >
+        <Tab.Screen name="Requests" component={PendingOrdersScreen} />
+        <Tab.Screen name="Completed Orders" component={CompletedOrdersScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
   );
 };
 
@@ -230,6 +273,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 10,
   },
+  signOutButton: { backgroundColor: 'red', padding: 10, marginTop: 20, alignItems: 'center', borderRadius: 5 },
+  signOutText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  pageText: { fontSize: 18, color: 'white', textAlign: 'center', marginTop: 20 },
 });
 
 export default TransporterDashboard;

@@ -6,9 +6,15 @@ import { fetchAPI } from '@/lib/fetch';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons'; // Icons for UI enhancement
+
+const Tab = createMaterialTopTabNavigator();
 
 
-const BuyerDashboard = () => {
+
+const PurchaseScreen = () => {
 
   const { user } = useUser();
   const { signOut } = useAuth();
@@ -147,6 +153,16 @@ const BuyerDashboard = () => {
       setLoading(false);
     }
   };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
+  };
+  
+  
   
   return (
     <StripeProvider
@@ -157,6 +173,9 @@ const BuyerDashboard = () => {
     <ScrollView contentContainerStyle={styles.container}>
       <SignedIn>
         <Text style={styles.header}>Hello {user?.emailAddresses[0].emailAddress}, welcome to your Buyer Dashboard!</Text>
+        <TouchableOpacity onPress={handleSignOut}>
+          <Ionicons name="log-out-outline" size={24} color="white" />
+        </TouchableOpacity>
         <Text style={styles.subheader}>Submit a Waste Request</Text>
 
         <TextInput style={styles.input} placeholder="Your Name" value={buyerName} onChangeText={setBuyerName} />
@@ -197,6 +216,42 @@ const BuyerDashboard = () => {
   );
 };
 
+const CompletedOrdersScreen = () => (
+  <View style={styles.container}>
+    <Text style={styles.pageText}>Completed Purchases will be shown here.</Text>
+  </View>
+);
+
+// Profile Screen
+const ProfileScreen = () => {
+  const { signOut } = useAuth();
+  const { user } = useUser();
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.pageText}>Welcome, {user?.emailAddresses[0].emailAddress}</Text>
+      <TouchableOpacity onPressIn={signOut} style={styles.signOutButton}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const BuyerDashboard = () => {
+  return (
+      <Tab.Navigator
+        screenOptions={{
+          tabBarStyle: { backgroundColor: '#085A2D' },
+          tabBarActiveTintColor: 'white',
+          tabBarIndicatorStyle: { backgroundColor: 'yellow' },
+        }}
+      >
+        <Tab.Screen name="Purchase" component={PurchaseScreen} />
+        <Tab.Screen name="Purchases" component={CompletedOrdersScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
+  );
+};
 const styles = StyleSheet.create({
   container: { flexGrow: 1, padding: 20, backgroundColor: '#fff', justifyContent: 'center' },
   header: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#085A2D' },
@@ -232,6 +287,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#007BFF',
   },
+  signOutButton: { backgroundColor: 'red', padding: 10, marginTop: 20, alignItems: 'center', borderRadius: 5 },
+  signOutText: { color: 'black', fontSize: 16, fontWeight: 'bold' },
+  pageText: { fontSize: 18, color: 'black', textAlign: 'center', marginTop: 20 },
 });
 
 export default BuyerDashboard;
