@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert, ActivityIndicator, View, FlatList } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert, ActivityIndicator, View, FlatList, RefreshControl } from 'react-native';
 import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { fetchAPI } from '@/lib/fetch';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Track from './track';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { NavigationContainer } from '@react-navigation/native';
@@ -66,9 +67,7 @@ const PurchaseScreen = () => {
       const sellerLocation = matchResponse.data[0].seller_location;
       let status = matchResponse.data[0].status;
       let id = matchResponse.data[0].id;
-      
-
-
+      await AsyncStorage.setItem('buyerName', buyerName);
 
       const checkStatus = async () => {
         let statusChecked = false;
@@ -221,84 +220,118 @@ const PurchaseScreen = () => {
   );
 };
 
-const CompletedOrdersScreen = ({ user }) => {
-  const [orders, setOrders] = useState([]);
+const CompletedOrdersScreen = () => {
+  interface Order {
+    id: number;
+    buyer_name: string;
+    seller_name: string;
+    seller_location: string;
+    buyer_location: string;
+    price: number;
+    created_at: string;
+    transporter_name: string;
+    status: string;
+  }
+
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false); // New state for pull-to-refresh
+  const [error, setError] = useState("");
+  const { user } = useUser();
+  const router = useRouter();
+  const [showTrackPage, setShowTrackPage] = useState(false);
 
-  const userEmail = user?.emailAddresses[0]?.emailAddress; // Get user email
+  const handleTrackPackage = () => {
+    setShowTrackPage(true);
+  };
 
-  useEffect(() => {
-    if (!userEmail) {
+  const buyer_name = AsyncStorage.getItem('buyerName');
+ 
+
+  // Fetch orders function (Reusable for refresh & initial load)
+  const fetchCompletedOrders = useCallback(async () => {
+    if (!buyer_name) return;
+
+    try {
+      if (!refreshing) setLoading(true); // Show loading only if not refreshing
+
+      const response = await fetch("/(api)/get-buyer-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ buyerName: buyer_name}),
+      });
+
+      const data = await response.json();
+      console.log("Fetched buyer orders:", data);
+
+      if (!response.ok) throw new Error(data.error || "No orders right now");
+
+      setOrders(data.data);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      setError(error.message || "Something went wrong");
+    } finally {
       setLoading(false);
-      setError("User email is required.");
-      return;
+      setRefreshing(false); // Stop refresh animation
     }
+  }, [buyer_name, refreshing]);
 
-    const fetchCompletedOrders = async () => {
-      try {
-        const response = await fetch("https://your-backend.com/api/completed-orders", { 
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch orders");
-        }
-
-        setOrders(data.data);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  // Initial fetch
+  useEffect(() => {
     fetchCompletedOrders();
-  }, [userEmail]);
+  }, [buyer_name]);
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007bff" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
+  // Refresh handler for pull-to-refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCompletedOrders();
+  };
 
   return (
     <View style={styles.container}>
-      {orders.length === 0 ? (
-        <Text style={styles.pageText}>No completed orders found.</Text>
-      ) : (
+      {/* Loading & Error Messages */}
+      {loading && !refreshing && <Text style={styles.loadingText}>Loading orders...</Text>}
+      {error && <Text style={styles.errorText}>Error: {error}</Text>}
+
+      {!loading && !error && Array.isArray(orders) && orders.length > 0 ? (
         <FlatList
           data={orders}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <Card style={styles.card}>
               <Card.Content>
-                <Text style={styles.cardTitle}>Order ID: {item.id}</Text>
-                <Text>Buyer: {item.buyer_name}</Text>
-                <Text>Seller: {item.seller_name}</Text>
-                <Text>Buyer Location: {item.buyer_location}</Text>
-                <Text>Seller Location: {item.seller_location}</Text>
-                <Text>Price: ${item.price}</Text>
-                <Text>Date: {new Date(item.created_at).toLocaleDateString()}</Text>
+                <Text style={styles.cardTitle}>Your order: {item.id}</Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="person-outline" size={16} /> You: {item.buyer_name}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="location-outline" size={16} /> Transporter: {item.transporter_name}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="navigate-outline" size={16} /> To: {item.buyer_location}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="pricetag-outline" size={16} /> Price: ${item.price}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="notifications-outline" size={16} /> Status: {item.status}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="calendar-outline" size={16} /> Date: {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+                <TouchableOpacity style={styles.trackButton} onPress={handleTrackPackage}>
+                  <Text style={styles.trackButtonText}>Track Package</Text>
+                </TouchableOpacity>
+                {showTrackPage && <Track orderId={item.id} />} {/* Passing orderId to Track */}
               </Card.Content>
             </Card>
           )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          } // Enable pull-to-refresh
         />
+      ) : (
+        !loading && <Text style={styles.noOrdersText}>No completed orders available.</Text>
       )}
     </View>
   );
@@ -362,7 +395,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     marginBottom: 5,
   },
   priceText: {
@@ -373,6 +406,51 @@ const styles = StyleSheet.create({
   signOutButton: { backgroundColor: 'red', padding: 10, marginTop: 20, alignItems: 'center', borderRadius: 5 },
   signOutText: { color: 'black', fontSize: 16, fontWeight: 'bold' },
   pageText: { fontSize: 18, color: 'black', textAlign: 'center', marginTop: 20 },
+  card: {
+    backgroundColor: "#1E1E1E", // Dark gray card background
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: "#fff", // Light shadow for contrast
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5, // For Android shadow
+  },
+  noOrdersText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+    marginTop: 20,
+  },
+  orderText: {
+    fontSize: 16,
+    color: '#DDD',
+    marginBottom: 5,
+  },
+  loadingText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  trackButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    backgroundColor: "#28a745", // Green background
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trackButtonText: {
+    color: "#fff", // White text
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });
 
 export default BuyerDashboard;

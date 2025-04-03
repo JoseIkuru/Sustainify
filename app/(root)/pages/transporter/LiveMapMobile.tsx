@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, View, Text, Button, StyleSheet, Linking, TouchableOpacity, ScrollView } from 'react-native';
+import { Alert, View, Text, Button, StyleSheet, Linking, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,6 +21,12 @@ const LiveMapMobile = () => {
     buyerAddress: '',
     currentAddress: '',
   });
+  const [statusMessage, setStatusMessage] = useState('');
+
+  const handleStatusChange = (text) => {
+    setStatusMessage(text);
+  };
+
 
   // Get Coordinates from Address using Google Maps API
   const getCoordinatesFromAddress = async (address: string) => {
@@ -340,6 +346,38 @@ const LiveMapMobile = () => {
         Alert.alert("Error", "Unable to process payment.");
       }
     };
+
+    const handleSubmitStatus = async () => {
+      // Logic to handle status update submission
+      const orderId = await AsyncStorage.getItem('orderId');
+      console.log('Order ID:', orderId);
+      console.log('Status Message:', statusMessage);
+      if (!statusMessage) {
+        Alert.alert('Error', 'Please enter a status message');
+        return;
+      }
+  
+      try {
+        const response = await fetchAPI('/(api)/add-status-message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            orderId: orderId,
+            statusMessage: statusMessage,
+          }),
+        });
+  
+        const data = await response;
+        console.log(data);
+
+      } catch (error) {
+
+        Alert.alert('Error', 'Failed to update status');
+        console.error(error);
+      }
+    };
     
     
   
@@ -376,6 +414,23 @@ const LiveMapMobile = () => {
               <Text style={styles.buttonText}>Complete Delivery</Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.statusContainer}>
+        <Text style={styles.statusTitle}>Add Status Update</Text>
+        <TextInput
+          style={styles.textBox}
+          placeholder="Enter your status update here..."
+          value={statusMessage}
+          onChangeText={handleStatusChange}
+          multiline
+          numberOfLines={4}
+        />
+        <TouchableOpacity
+          style={styles.submitButton}
+          onPress={handleSubmitStatus}
+        >
+          <Text style={styles.submitButtonText}>Submit Status</Text>
+        </TouchableOpacity>
+      </View>
         </ScrollView>
       );
     };
@@ -430,6 +485,44 @@ const LiveMapMobile = () => {
       },
       activeButton: {
         backgroundColor: '#0056b3',
+      },
+      statusContainer: {
+        backgroundColor: '#ffffff',
+        padding: 16,
+        borderRadius: 8,
+        marginBottom: 20,
+        shadowColor: '#000000',
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 5,
+        marginTop: 20,
+      },
+      statusTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 10,
+      },
+      textBox: {
+        height: 150,
+        borderColor: '#ced4da',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        marginBottom: 16,
+        textAlignVertical: 'top',
+        backgroundColor: '#f1f3f5',
+      },
+      submitButton: {
+        backgroundColor: '#007bff',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+      },
+      submitButtonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: 'bold',
       },
     });
      
