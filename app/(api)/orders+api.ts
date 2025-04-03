@@ -1,7 +1,5 @@
 import { neon } from '@neondatabase/serverless';
 
-
-
 export async function GET(request: Request) {
   try {
     // Ensure DATABASE_URL is set
@@ -14,20 +12,10 @@ export async function GET(request: Request) {
 
     const sql = neon(`${process.env.DATABASE_URL}`);
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-
-    let orders;
-    if (status) {
-      orders = await sql`
-        SELECT * FROM orders WHERE status = ${status} ORDER BY created_at DESC;
-      `;
-    } else {
-      orders = await sql`
-        SELECT * FROM orders ORDER BY created_at DESC;
-      `;
-    }
+    // Fetch only orders with status = 'pending'
+    const orders = await sql`
+      SELECT * FROM orders WHERE status = 'pending' ORDER BY created_at DESC;
+    `;
 
     return new Response(JSON.stringify({ data: orders }), {
       status: 200,
@@ -35,7 +23,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error("Error fetching orders:", error);
+    console.error("Error fetching pending orders:", error);
     return new Response(JSON.stringify({ error: "Internal Server Error" }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

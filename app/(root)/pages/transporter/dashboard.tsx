@@ -1,12 +1,14 @@
-import React from 'react';
+import React,{ useCallback, useEffect, useState } from 'react';
 import { 
-  View, Text, FlatList, StyleSheet, TouchableOpacity, Button, Alert 
+  View, Text, FlatList, StyleSheet, TouchableOpacity, Button, Alert, 
+  RefreshControl
 } from 'react-native';
 import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { fetchAPI, useFetch } from '@/lib/fetch';
 import { Ionicons } from '@expo/vector-icons'; // Icons for UI enhancement
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Card } from "react-native-paper";
 
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -15,6 +17,14 @@ import { NavigationContainer } from '@react-navigation/native';
 const Tab = createMaterialTopTabNavigator();
 
 const PendingOrdersScreen = () => {
+  interface Order {
+    id: number;
+    seller_name: string;
+    waste_type: string;
+    waste_size: number;
+    seller_location: string;
+    buyer_location: string;
+  }
   const { signOut } = useAuth();
   const router = useRouter();
   const { user } = useUser();
@@ -105,7 +115,7 @@ const PendingOrdersScreen = () => {
         {!loading && !error && Array.isArray(data) && data.length > 0 ? (
           <FlatList
             data={data}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item: Order) => item.id.toString()}
             renderItem={({ item }) => (
               <View style={styles.orderCard}>
                 <View style={styles.orderHeader}>
@@ -152,11 +162,111 @@ const PendingOrdersScreen = () => {
   );
 };
 
-const CompletedOrdersScreen = () => (
-  <View style={styles.container}>
-    <Text style={styles.pageText}>Completed Orders will be shown here.</Text>
-  </View>
-);
+
+const CompletedOrdersScreen = () => {
+  interface Order {
+    id: number;
+    buyer_name: string;
+    seller_name: string;
+    seller_location: string;
+    buyer_location: string;
+    price: number;
+    created_at: string;
+  }
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // New state for pull-to-refresh
+  const [error, setError] = useState("");
+  const { user } = useUser();
+
+  const userEmail = user?.emailAddresses[0]?.emailAddress; // Extract user email
+
+  // Fetch orders function (Reusable for refresh & initial load)
+  const fetchCompletedOrders = useCallback(async () => {
+    if (!userEmail) return;
+
+    try {
+      if (!refreshing) setLoading(true); // Show loading only if not refreshing
+
+      const response = await fetch("/(api)/get-completed-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail }),
+      });
+
+      const data = await response.json();
+      console.log("Fetched completed orders:", data);
+
+      if (!response.ok) throw new Error(data.error || "Failed to fetch orders");
+
+      setOrders(data.data);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      setError(error.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+      setRefreshing(false); // Stop refresh animation
+    }
+  }, [userEmail, refreshing]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchCompletedOrders();
+  }, [userEmail]);
+
+  // Refresh handler for pull-to-refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCompletedOrders();
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Loading & Error Messages */}
+      {loading && !refreshing && <Text style={styles.loadingText}>Loading orders...</Text>}
+      {error && <Text style={styles.errorText}>Error: {error}</Text>}
+
+      {!loading && !error && Array.isArray(orders) && orders.length > 0 ? (
+        <FlatList
+          data={orders}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text style={styles.cardTitle}>✅ Completed Order</Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="person-outline" size={16} /> Buyer: {item.buyer_name}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="person-outline" size={16} /> Seller: {item.seller_name}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="location-outline" size={16} /> From: {item.seller_location}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="navigate-outline" size={16} /> To: {item.buyer_location}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="pricetag-outline" size={16} /> Price: ${item.price}
+                </Text>
+                <Text style={styles.orderText}>
+                  <Ionicons name="calendar-outline" size={16} /> Date: {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+              </Card.Content>
+            </Card>
+          )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          } // Enable pull-to-refresh
+        />
+      ) : (
+        !loading && <Text style={styles.noOrdersText}>No completed orders available.</Text>
+      )}
+    </View>
+  );
+};
+
 
 // Profile Screen
 const ProfileScreen = () => {
@@ -276,6 +386,23 @@ const styles = StyleSheet.create({
   signOutButton: { backgroundColor: 'red', padding: 10, marginTop: 20, alignItems: 'center', borderRadius: 5 },
   signOutText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
   pageText: { fontSize: 18, color: 'white', textAlign: 'center', marginTop: 20 },
+  card: {
+    backgroundColor: "#1E1E1E", // Dark gray card background
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: "#fff", // Light shadow for contrast
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5, // For Android shadow
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff", // White text
+    marginBottom: 5,
+  },
 });
 
 export default TransporterDashboard;

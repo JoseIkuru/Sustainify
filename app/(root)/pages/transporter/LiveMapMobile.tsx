@@ -297,6 +297,17 @@ const LiveMapMobile = () => {
 
         const orderId = await AsyncStorage.getItem('orderId');
         console.log(orderId)
+
+        const change = await fetch("/(api)/update-status-completed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId }),
+        });
+    
+        const changed = await change.json();
+        console.log(changed)
+
+
         const response = await fetch("/(api)/get-price", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

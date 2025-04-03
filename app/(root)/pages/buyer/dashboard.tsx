@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert, ActivityIndicator, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, Button, Alert, ActivityIndicator, View, FlatList } from 'react-native';
 import { SignedIn, SignedOut, useUser, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { fetchAPI } from '@/lib/fetch';
@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons'; // Icons for UI enhancement
+import { Card } from 'react-native-paper'; // Import Card from react-native-paper
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -64,7 +65,11 @@ const PurchaseScreen = () => {
 
       const sellerLocation = matchResponse.data[0].seller_location;
       let status = matchResponse.data[0].status;
-      let id = 28;
+      let id = matchResponse.data[0].id;
+      
+
+
+
       const checkStatus = async () => {
         let statusChecked = false;
         console.log("Initial statusChecked:", statusChecked);
@@ -216,11 +221,89 @@ const PurchaseScreen = () => {
   );
 };
 
-const CompletedOrdersScreen = () => (
-  <View style={styles.container}>
-    <Text style={styles.pageText}>Completed Purchases will be shown here.</Text>
-  </View>
-);
+const CompletedOrdersScreen = ({ user }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const userEmail = user?.emailAddresses[0]?.emailAddress; // Get user email
+
+  useEffect(() => {
+    if (!userEmail) {
+      setLoading(false);
+      setError("User email is required.");
+      return;
+    }
+
+    const fetchCompletedOrders = async () => {
+      try {
+        const response = await fetch("https://your-backend.com/api/completed-orders", { 
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch orders");
+        }
+
+        setOrders(data.data);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCompletedOrders();
+  }, [userEmail]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007bff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {orders.length === 0 ? (
+        <Text style={styles.pageText}>No completed orders found.</Text>
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text style={styles.cardTitle}>Order ID: {item.id}</Text>
+                <Text>Buyer: {item.buyer_name}</Text>
+                <Text>Seller: {item.seller_name}</Text>
+                <Text>Buyer Location: {item.buyer_location}</Text>
+                <Text>Seller Location: {item.seller_location}</Text>
+                <Text>Price: ${item.price}</Text>
+                <Text>Date: {new Date(item.created_at).toLocaleDateString()}</Text>
+              </Card.Content>
+            </Card>
+          )}
+        />
+      )}
+    </View>
+  );
+};
+
 
 // Profile Screen
 const ProfileScreen = () => {
@@ -230,7 +313,7 @@ const ProfileScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.pageText}>Welcome, {user?.emailAddresses[0].emailAddress}</Text>
-      <TouchableOpacity onPressIn={signOut} style={styles.signOutButton}>
+      <TouchableOpacity onPress={signOut} style={styles.signOutButton}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </View>
